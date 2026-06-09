@@ -1,6 +1,22 @@
-export type Category = 'food' | 'work' | 'family' | 'activity' | 'shopping' | 'other';
+export type Category =
+  | "food"
+  | "work"
+  | "family"
+  | "activity"
+  | "shopping"
+  | "other";
 
-export type CustomColor = 'orange' | 'blue' | 'pink' | 'green' | 'purple' | 'gray' | 'red' | 'yellow' | 'teal' | 'indigo';
+export type CustomColor =
+  | "orange"
+  | "blue"
+  | "pink"
+  | "green"
+  | "purple"
+  | "gray"
+  | "red"
+  | "yellow"
+  | "teal"
+  | "indigo";
 
 export interface RecordItem {
   id: string;
@@ -27,12 +43,12 @@ export const CUSTOM_COLORS: Record<CustomColor, string> = {
 };
 
 export const CATEGORIES: { id: Category; label: string }[] = [
-  { id: 'food', label: '🍔 餐饮' },
-  { id: 'work', label: '💻 工作' },
-  { id: 'family', label: '🏠 家庭' },
-  { id: 'activity', label: '🏃 活动' },
-  { id: 'shopping', label: '🛒 购物' },
-  { id: 'other', label: '📦 其他' }
+  { id: "food", label: "🍔 餐饮" },
+  { id: "work", label: "💻 工作" },
+  { id: "family", label: "🏠 家庭" },
+  { id: "activity", label: "🏃 活动" },
+  { id: "shopping", label: "🛒 购物" },
+  { id: "other", label: "📦 其他" },
 ];
 
 export const CATEGORY_COLORS: Record<Category, string> = {
@@ -42,4 +58,57 @@ export const CATEGORY_COLORS: Record<Category, string> = {
   activity: "bg-green-100 text-green-800",
   shopping: "bg-purple-100 text-purple-800",
   other: "bg-gray-100 text-gray-800",
+};
+
+// ─── Sticky Notes ────────────────────────────────────────────────────────────
+
+export type StickyNoteColor = "yellow" | "pink" | "blue" | "green" | "purple";
+
+export interface StickyNote {
+  id: string;
+  content: string;
+  color: StickyNoteColor;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export const STICKY_NOTE_COLORS: Record<
+  StickyNoteColor,
+  {
+    bg: string;
+    border: string;
+    text: string;
+    dot: string;
+  }
+> = {
+  yellow: {
+    bg: "bg-yellow-100",
+    border: "border-yellow-300",
+    text: "text-yellow-900",
+    dot: "bg-yellow-400",
+  },
+  pink: {
+    bg: "bg-pink-100",
+    border: "border-pink-300",
+    text: "text-pink-900",
+    dot: "bg-pink-400",
+  },
+  blue: {
+    bg: "bg-sky-100",
+    border: "border-sky-300",
+    text: "text-sky-900",
+    dot: "bg-sky-400",
+  },
+  green: {
+    bg: "bg-green-100",
+    border: "border-green-300",
+    text: "text-green-900",
+    dot: "bg-green-400",
+  },
+  purple: {
+    bg: "bg-purple-100",
+    border: "border-purple-300",
+    text: "text-purple-900",
+    dot: "bg-purple-400",
+  },
 };

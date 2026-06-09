@@ -2,28 +2,165 @@ import { useState, useMemo, useRef } from "react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { getMonthData, formatDateKey, isSameDay } from "./lib/dateUtils";
 import { useRecords } from "./hooks/useRecords";
+import { useStickyNotes } from "./hooks/useStickyNotes";
 import { Sidebar } from "./components/Sidebar";
 import { AddEntryModal } from "./components/AddEntryModal";
 import { TotalSpentModal } from "./components/TotalSpentModal";
-import { CATEGORY_COLORS, CUSTOM_COLORS, RecordItem } from "./types";
+import { StickyNotesPanel } from "./components/StickyNotesPanel";
+import {
+  CATEGORY_COLORS,
+  CUSTOM_COLORS,
+  RecordItem,
+  RecordsData,
+  StickyNote,
+} from "./types";
+
+// ─── Import / Export helpers ──────────────────────────────────────────────────
+
+function isValidRecordsData(data: unknown): data is RecordsData {
+  if (typeof data !== "object" || data === null || Array.isArray(data))
+    return false;
+  return Object.entries(data).every(
+    ([, val]) =>
+      Array.isArray(val) &&
+      val.every(
+        (r) =>
+          typeof r === "object" &&
+          r !== null &&
+          typeof (r as any).id === "string" &&
+          typeof (r as any).description === "string" &&
+          typeof (r as any).cost === "number",
+      ),
+  );
+}
+
+function isValidNotes(data: unknown): data is StickyNote[] {
+  if (!Array.isArray(data)) return false;
+  return data.every(
+    (n) =>
+      typeof n === "object" &&
+      n !== null &&
+      typeof (n as any).id === "string" &&
+      typeof (n as any).content === "string",
+  );
+}
+
+/** Parses a JSON export file (v2 or legacy). Returns parsed data or an error string. */
+function parseExportFile(
+  raw: unknown,
+): { records: RecordsData; notes: StickyNote[] } | { error: string } {
+  if (typeof raw !== "object" || raw === null)
+    return { error: "Invalid file format." };
+
+  // v2 format: { version: 2, records: {...}, notes: [...] }
+  if ("version" in raw && (raw as any).version === 2) {
+    const { records, notes } = raw as any;
+    if (!isValidRecordsData(records)) return { error: "Invalid records data." };
+    if (!isValidNotes(notes)) return { error: "Invalid notes data." };
+    return { records, notes };
+  }
+
+  // Legacy format: bare RecordsData object
+  if (isValidRecordsData(raw)) {
+    return { records: raw, notes: [] };
+  }
+
+  return { error: "Unrecognized file format." };
+}
+
+// ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
   const [viewDate, setViewDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTotalModalOpen, setIsTotalModalOpen] = useState(false);
+  const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<RecordItem | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
   const {
     records,
     addRecord,
     removeRecord,
     updateRecord,
-    exportRecords,
-    parseAndImport,
+    replaceAllRecords,
+    mergeAllRecords,
   } = useRecords();
+  const {
+    notes,
+    addNote,
+    updateNote,
+    removeNote,
+    replaceAllNotes,
+    mergeAllNotes,
+  } = useStickyNotes();
 
+  // ── Export ─────────────────────────────────────────────────────────────────
+  const handleExport = () => {
+    const payload = { version: 2, records, notes };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `expense_records_${new Date().toISOString().split("T")[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  // ── Import ─────────────────────────────────────────────────────────────────
+  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    e.target.value = "";
+
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      try {
+        const raw = JSON.parse(ev.target?.result as string);
+        const result = parseExportFile(raw);
+
+        if ("error" in result) {
+          setImportStatus(`✗ ${result.error}`);
+          setTimeout(() => setImportStatus(null), 3000);
+          return;
+        }
+
+        const totalDays = Object.keys(result.records).length;
+        const totalRecords = Object.values(result.records).flat().length;
+        const notesCount = result.notes.length;
+
+        const replace = window.confirm(
+          `Import ${totalRecords} record(s) across ${totalDays} day(s)` +
+            (notesCount ? ` and ${notesCount} note(s)` : "") +
+            ".\n\nOK → Replace all existing data\nCancel → Merge (keep existing, add new)",
+        );
+
+        if (replace) {
+          replaceAllRecords(result.records);
+          replaceAllNotes(result.notes);
+        } else {
+          mergeAllRecords(result.records);
+          mergeAllNotes(result.notes);
+        }
+
+        setImportStatus("✓ Imported");
+      } catch {
+        setImportStatus("✗ Could not parse JSON file.");
+      }
+      setTimeout(() => setImportStatus(null), 3000);
+    };
+    reader.onerror = () => {
+      setImportStatus("✗ Could not read file.");
+      setTimeout(() => setImportStatus(null), 3000);
+    };
+    reader.readAsText(file);
+  };
+
+  // ── Calendar helpers ───────────────────────────────────────────────────────
   const prevMonth = () =>
     setViewDate(new Date(viewDate.getFullYear(), viewDate.getMonth() - 1, 1));
   const nextMonth = () =>
@@ -34,28 +171,13 @@ export default function App() {
     setSelectedDate(now);
   };
 
-  const handleImportFile = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    e.target.value = ""; // reset so same file can be re-imported if needed
-    const result = await parseAndImport(file);
-    if (result.success) {
-      setImportStatus("✓ Imported");
-    } else {
-      setImportStatus(`✗ ${result.error ?? "Import failed"}`);
-    }
-    setTimeout(() => setImportStatus(null), 3000);
-  };
-
   const monthDays = useMemo(
     () => getMonthData(viewDate.getFullYear(), viewDate.getMonth()),
     [viewDate],
   );
 
   const monthTotal = useMemo(() => {
-    const targetPrefix = `${viewDate.getFullYear()}-${String(
-      viewDate.getMonth() + 1,
-    ).padStart(2, "0")}`;
+    const targetPrefix = `${viewDate.getFullYear()}-${String(viewDate.getMonth() + 1).padStart(2, "0")}`;
     return Object.entries(records).reduce((sum, [key, dayRecs]) => {
       if (key.startsWith(targetPrefix) && Array.isArray(dayRecs)) {
         return sum + dayRecs.reduce((daySum, r) => daySum + r.cost, 0);
@@ -67,7 +189,6 @@ export default function App() {
   const { lifetimeTotal, monthlyTotals } = useMemo(() => {
     let total = 0;
     const months: Record<string, number> = {};
-
     Object.entries(records).forEach(([dateKey, dayRecs]) => {
       if (!Array.isArray(dayRecs)) return;
       const monthKey = dateKey.substring(0, 7);
@@ -75,11 +196,9 @@ export default function App() {
       total += dayTotal;
       months[monthKey] = (months[monthKey] || 0) + dayTotal;
     });
-
     const sortedMonths = Object.entries(months).sort((a, b) =>
       b[0].localeCompare(a[0]),
     );
-
     return { lifetimeTotal: total, monthlyTotals: sortedMonths };
   }, [records]);
 
@@ -139,16 +258,16 @@ export default function App() {
   return (
     <div className="w-full h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans flex overflow-hidden relative">
       <main className="flex-1 flex flex-col z-10">
-        <header className="h-24 px-10 flex items-center justify-between border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
-          <div className="flex items-baseline gap-4">
+        {/* ── Header ─────────────────────────────────────────────────────── */}
+        <header className="h-24 px-10 flex items-end pb-5 justify-between border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
+          <div>
             <h1 className="font-serif text-3xl sm:text-5xl tracking-tighter">
-              是啊，吃什么
+              是啊，吃什么。
             </h1>
-            <span className="text-[10px] sm:text-sm font-semibold uppercase tracking-widest opacity-40 hidden sm:inline-block">
-              Life Expense Log
-            </span>
           </div>
+
           <div className="flex items-center gap-6 sm:gap-8">
+            {/* Month navigation */}
             <div className="flex items-center gap-2">
               <button
                 onClick={prevMonth}
@@ -175,22 +294,37 @@ export default function App() {
               Today
             </button>
 
-            {/* Import / Export */}
+            {/* Utility buttons: Notes, Export, Import */}
             <div className="hidden sm:flex items-center gap-2">
+              {/* Notes toggle */}
               <button
-                onClick={exportRecords}
-                title="Download a JSON backup of all your records"
+                onClick={() => setIsNotesOpen(true)}
+                className="text-[10px] font-bold uppercase tracking-widest opacity-50 hover:opacity-100 border border-black/20 px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5"
+              >
+                📌 Notes
+                {notes.length > 0 && (
+                  <span className="bg-black/10 rounded-full px-1.5 tabular-nums">
+                    {notes.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={handleExport}
+                title="Download a JSON backup of all records and notes"
                 className="text-[10px] font-bold uppercase tracking-widest opacity-50 hover:opacity-100 border border-black/20 px-3 py-1.5 rounded-full transition-all"
               >
                 ↓ Export
               </button>
+
               <button
                 onClick={() => fileInputRef.current?.click()}
-                title="Import records from a JSON backup"
+                title="Import records and notes from a JSON backup"
                 className="text-[10px] font-bold uppercase tracking-widest opacity-50 hover:opacity-100 border border-black/20 px-3 py-1.5 rounded-full transition-all"
               >
                 ↑ Import
               </button>
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -198,15 +332,21 @@ export default function App() {
                 className="hidden"
                 onChange={handleImportFile}
               />
+
               {importStatus && (
                 <span
-                  className={`text-[10px] font-bold uppercase tracking-widest transition-opacity ${importStatus.startsWith("✓") ? "text-green-600" : "text-red-500"}`}
+                  className={`text-[10px] font-bold uppercase tracking-widest transition-opacity ${
+                    importStatus.startsWith("✓")
+                      ? "text-green-600"
+                      : "text-red-500"
+                  }`}
                 >
                   {importStatus}
                 </span>
               )}
             </div>
 
+            {/* Totals */}
             <div className="flex items-center gap-6 hidden md:flex">
               <div
                 className="text-right cursor-pointer group"
@@ -235,6 +375,7 @@ export default function App() {
           </div>
         </header>
 
+        {/* ── Calendar ───────────────────────────────────────────────────── */}
         <section className="flex-1 flex flex-col h-full overflow-hidden p-4 sm:p-8 lg:p-12 relative z-10">
           <div className="flex-1 flex flex-col bg-[#FAF9F6]/60 backdrop-blur-md border border-[rgba(0,0,0,0.08)] rounded-2xl shadow-sm overflow-hidden">
             <div className="grid grid-cols-7 border-b border-[rgba(0,0,0,0.08)] bg-[#FAF9F6]/80 shrink-0">
@@ -247,16 +388,13 @@ export default function App() {
                 </div>
               ))}
             </div>
+
             <div className="flex-1 grid grid-cols-7 auto-rows-fr overflow-y-auto min-h-0 bg-transparent">
               {monthDays.map((day, idx) => {
                 const key = formatDateKey(day.date);
                 const isToday = isSameDay(day.date, new Date());
                 const isSelected = isSameDay(day.date, selectedDate);
                 const dailyRecords = records[key] || [];
-                const dailyTotal = dailyRecords.reduce(
-                  (sum, r) => sum + r.cost,
-                  0,
-                );
 
                 const colorRecords = dailyRecords.filter(
                   (r) =>
@@ -283,13 +421,25 @@ export default function App() {
                     className={`border-r border-b border-[rgba(0,0,0,0.08)] p-3 transition-colors cursor-pointer flex flex-col relative select-none
                       ${(idx + 1) % 7 === 0 ? "border-r-0" : ""}
                       ${idx >= monthDays.length - 7 ? "border-b-0" : ""}
-                      ${dayBgClass ? (day.isCurrentMonth ? dayBgClass : `${dayBgClass} opacity-40`) : day.isCurrentMonth ? "bg-white/60" : "bg-transparent opacity-40"}
+                      ${
+                        dayBgClass
+                          ? day.isCurrentMonth
+                            ? dayBgClass
+                            : `${dayBgClass} opacity-40`
+                          : day.isCurrentMonth
+                            ? "bg-white/60"
+                            : "bg-transparent opacity-40"
+                      }
                       ${isSelected ? "ring-2 ring-black ring-inset z-10" : "hover:brightness-95"}
                     `}
                   >
                     <div className="flex justify-between items-start mb-2 relative z-10">
                       <span
-                        className={`font-bold text-sm ${day.isCurrentMonth ? "" : "italic opacity-60"} ${isToday ? "bg-black text-white w-6 h-6 flex items-center justify-center rounded-full text-xs" : ""}`}
+                        className={`font-bold text-sm ${day.isCurrentMonth ? "" : "italic opacity-60"} ${
+                          isToday
+                            ? "bg-black text-white w-6 h-6 flex items-center justify-center rounded-full text-xs"
+                            : ""
+                        }`}
                       >
                         {isToday
                           ? day.date.getDate()
@@ -343,6 +493,7 @@ export default function App() {
         </section>
       </main>
 
+      {/* ── Right sidebar ─────────────────────────────────────────────────── */}
       <Sidebar
         selectedDate={selectedDate}
         dailyRecords={selectedDayRecords}
@@ -354,6 +505,7 @@ export default function App() {
         onEditRecord={(record) => handleEditRecord(selectedDate, record)}
       />
 
+      {/* ── Modals & Panels ───────────────────────────────────────────────── */}
       <AddEntryModal
         isOpen={isModalOpen}
         onClose={() => setIsModalOpen(false)}
@@ -372,6 +524,16 @@ export default function App() {
         monthlyTotals={monthlyTotals}
       />
 
+      <StickyNotesPanel
+        isOpen={isNotesOpen}
+        onClose={() => setIsNotesOpen(false)}
+        notes={notes}
+        onAdd={addNote}
+        onUpdate={updateNote}
+        onRemove={removeNote}
+      />
+
+      {/* Decorative circles */}
       <div className="absolute -bottom-16 -left-16 w-64 h-64 border border-black rounded-full opacity-5 pointer-events-none"></div>
       <div className="absolute top-1/2 -right-32 w-80 h-80 border border-black rounded-full opacity-5 pointer-events-none"></div>
     </div>
