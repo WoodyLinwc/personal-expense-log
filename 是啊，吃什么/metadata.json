@@ -1,0 +1,6 @@
+{
+  "name": "是啊，吃什么",
+  "description": "一个简单直观的日历记账应用，用于记录每日饮食和开销。",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
