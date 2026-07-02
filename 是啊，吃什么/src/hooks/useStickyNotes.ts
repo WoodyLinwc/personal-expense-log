@@ -5,6 +5,15 @@ import { StickyNote, StickyNoteColor } from "../types";
 
 const NOTES_STORAGE_KEY = "yeah_what_to_eat_notes";
 
+/**
+ * Firestore rejects any field with a literal `undefined` value by throwing
+ * synchronously. Round-tripping through JSON strips those keys entirely,
+ * keeping writes safe regardless of the data shape.
+ */
+function stripUndefined<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
+}
+
 /** Merges two note lists, deduplicating by id. */
 function mergeNotesData(a: StickyNote[], b: StickyNote[]): StickyNote[] {
   const existingIds = new Set(a.map((n) => n.id));
@@ -51,7 +60,7 @@ export function useStickyNotes(uid: string | null) {
         const merged = mergeNotesData(notesRef.current, cloudNotes);
         setNotes(merged);
         syncedUidRef.current = uid;
-        await setDoc(ref, { notes: merged }, { merge: true });
+        await setDoc(ref, { notes: stripUndefined(merged) }, { merge: true });
       } catch (err) {
         console.error("Cloud sync (notes) failed:", err);
       }
@@ -64,9 +73,13 @@ export function useStickyNotes(uid: string | null) {
   useEffect(() => {
     if (!uid || syncedUidRef.current !== uid) return;
     const ref = doc(db, "users", uid);
-    setDoc(ref, { notes }, { merge: true }).catch((err) =>
-      console.error("Cloud sync (notes) failed:", err),
-    );
+    try {
+      setDoc(ref, { notes: stripUndefined(notes) }, { merge: true }).catch(
+        (err) => console.error("Cloud sync (notes) failed:", err),
+      );
+    } catch (err) {
+      console.error("Cloud sync (notes) failed:", err);
+    }
   }, [notes, uid]);
 
   /** Creates a new note and returns its id so the caller can auto-focus it. */

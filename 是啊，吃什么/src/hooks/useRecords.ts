@@ -5,6 +5,17 @@ import { RecordItem, RecordsData } from "../types";
 
 const STORAGE_KEY = "yeah_what_to_eat_records";
 
+/**
+ * Firestore rejects any field with a literal `undefined` value by throwing
+ * synchronously (not just a rejected promise) — e.g. `customColor: undefined`
+ * on a record with no custom color. Round-tripping through JSON strips those
+ * keys entirely (matching how they're already stored in localStorage), which
+ * keeps writes safe without changing the shape callers rely on.
+ */
+function stripUndefined<T>(data: T): T {
+  return JSON.parse(JSON.stringify(data));
+}
+
 /** Merges two RecordsData objects, deduplicating entries by id. */
 function mergeRecordsData(a: RecordsData, b: RecordsData): RecordsData {
   const merged: RecordsData = { ...a };
@@ -62,7 +73,7 @@ export function useRecords(uid: string | null) {
         const merged = mergeRecordsData(recordsRef.current, cloudRecords);
         setRecords(merged);
         syncedUidRef.current = uid;
-        await setDoc(ref, { records: merged }, { merge: true });
+        await setDoc(ref, { records: stripUndefined(merged) }, { merge: true });
       } catch (err) {
         console.error("Cloud sync (records) failed:", err);
       }
@@ -76,9 +87,15 @@ export function useRecords(uid: string | null) {
   useEffect(() => {
     if (!uid || syncedUidRef.current !== uid) return;
     const ref = doc(db, "users", uid);
-    setDoc(ref, { records }, { merge: true }).catch((err) =>
-      console.error("Cloud sync (records) failed:", err),
-    );
+    try {
+      setDoc(ref, { records: stripUndefined(records) }, { merge: true }).catch(
+        (err) => console.error("Cloud sync (records) failed:", err),
+      );
+    } catch (err) {
+      // setDoc can throw synchronously (not just reject) for invalid data
+      // (e.g. an undefined field) — never let that crash the whole app.
+      console.error("Cloud sync (records) failed:", err);
+    }
   }, [records, uid]);
 
   const addRecord = (dateKey: string, record: Omit<RecordItem, "id">) => {
