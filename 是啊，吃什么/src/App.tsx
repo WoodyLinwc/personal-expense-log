@@ -5,6 +5,8 @@ import {
   LogOut,
   Cloud,
   CloudOff,
+  MoreHorizontal,
+  X,
 } from "lucide-react";
 import { getMonthData, formatDateKey, isSameDay } from "./lib/dateUtils";
 import { useAuth } from "./hooks/useAuth";
@@ -84,6 +86,7 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTotalModalOpen, setIsTotalModalOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<RecordItem | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -264,8 +267,8 @@ export default function App() {
   };
 
   return (
-    <div className="w-full h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans flex overflow-hidden relative">
-      <main className="flex-1 flex flex-col z-10">
+    <div className="w-full h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans flex flex-col md:flex-row overflow-y-auto md:overflow-hidden relative">
+      <main className="flex flex-col z-10 md:flex-1 min-h-0">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <header className="min-h-24 px-10 pt-6 pb-5 flex items-end justify-between border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
           <div className="shrink-0">
@@ -294,6 +297,19 @@ export default function App() {
                 <ChevronRight className="w-6 h-6" />
               </button>
             </div>
+
+            {/* Mobile: collapse Today/Sync/Notes/Export/Import/Totals into one menu */}
+            <button
+              onClick={() => setIsMobileMenuOpen((v) => !v)}
+              className="sm:hidden p-2 rounded-full border border-black/20 opacity-60 hover:opacity-100 transition-opacity"
+              aria-label="More options"
+            >
+              {isMobileMenuOpen ? (
+                <X className="w-5 h-5" />
+              ) : (
+                <MoreHorizontal className="w-5 h-5" />
+              )}
+            </button>
 
             <button
               onClick={goToday}
@@ -414,8 +430,123 @@ export default function App() {
           </div>
         </header>
 
+        {/* ── Mobile menu (Today / Sync / Notes / Export / Import / Totals) ── */}
+        {isMobileMenuOpen && (
+          <div className="sm:hidden border-b border-[rgba(0,0,0,0.05)] bg-[#FAF9F6]/95 backdrop-blur-md px-5 py-4 flex flex-col gap-3 z-10">
+            <div className="flex items-center gap-4">
+              <div>
+                <p className="text-[10px] uppercase tracking-widest opacity-50 font-bold">
+                  Monthly Spent
+                </p>
+                <p className="font-serif text-xl italic">
+                  ¥{monthTotal.toFixed(2)}
+                </p>
+              </div>
+              <div className="w-[1px] h-8 bg-black/10"></div>
+              <button
+                className="text-left"
+                onClick={() => {
+                  setIsTotalModalOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+              >
+                <p className="text-[10px] uppercase tracking-widest opacity-50 font-bold">
+                  Total Spent &rarr;
+                </p>
+                <p className="font-serif text-xl italic opacity-70">
+                  ¥{lifetimeTotal.toFixed(2)}
+                </p>
+              </button>
+            </div>
+
+            <div className="flex flex-wrap gap-2 pt-1">
+              <button
+                onClick={() => {
+                  goToday();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="text-[10px] font-bold uppercase tracking-widest opacity-60 border border-black/20 px-3 py-1.5 rounded-full"
+              >
+                Today
+              </button>
+
+              {loading ? (
+                <div className="text-[10px] font-bold uppercase tracking-widest opacity-30 border border-black/10 px-3 py-1.5 rounded-full flex items-center gap-1.5">
+                  <Cloud className="w-3 h-3 animate-pulse" />
+                  <span className="animate-pulse">···</span>
+                </div>
+              ) : user ? (
+                <button
+                  onClick={signOutUser}
+                  className="text-[10px] font-bold uppercase tracking-widest opacity-60 border border-black/20 px-3 py-1.5 rounded-full flex items-center gap-1.5"
+                >
+                  <Cloud className="w-3 h-3" />
+                  Synced
+                  <LogOut className="w-3 h-3 opacity-60" />
+                </button>
+              ) : (
+                <button
+                  onClick={signInWithGoogle}
+                  className="text-[10px] font-bold uppercase tracking-widest bg-black text-white px-3 py-1.5 rounded-full flex items-center gap-1.5"
+                >
+                  <CloudOff className="w-3 h-3" />
+                  Sign in to sync
+                </button>
+              )}
+
+              <button
+                onClick={() => {
+                  setIsNotesOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="text-[10px] font-bold uppercase tracking-widest opacity-60 border border-black/20 px-3 py-1.5 rounded-full flex items-center gap-1.5"
+              >
+                📌 Notes
+                {notes.length > 0 && (
+                  <span className="bg-black/10 rounded-full px-1.5 tabular-nums">
+                    {notes.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  handleExport();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="text-[10px] font-bold uppercase tracking-widest opacity-60 border border-black/20 px-3 py-1.5 rounded-full"
+              >
+                ↓ Export
+              </button>
+
+              <button
+                onClick={() => {
+                  fileInputRef.current?.click();
+                  setIsMobileMenuOpen(false);
+                }}
+                className="text-[10px] font-bold uppercase tracking-widest opacity-60 border border-black/20 px-3 py-1.5 rounded-full"
+              >
+                ↑ Import
+              </button>
+            </div>
+
+            {error && <span className="text-[10px] text-red-500">{error}</span>}
+            {importStatus && (
+              <span
+                className={`text-[10px] font-bold uppercase tracking-widest ${
+                  importStatus.startsWith("✓")
+                    ? "text-green-600"
+                    : "text-red-500"
+                }`}
+              >
+                {importStatus}
+              </span>
+            )}
+          </div>
+        )}
+
         {/* ── Calendar ───────────────────────────────────────────────────── */}
-        <section className="flex-1 flex flex-col h-full overflow-hidden p-4 sm:p-8 lg:p-12 relative z-10">
+        <section className="flex-1 flex flex-col h-[65vh] md:h-full overflow-hidden p-3 sm:p-8 lg:p-12 relative z-10">
           <div className="flex-1 flex flex-col bg-[#FAF9F6]/60 backdrop-blur-md border border-[rgba(0,0,0,0.08)] rounded-2xl shadow-sm overflow-hidden">
             <div className="grid grid-cols-7 border-b border-[rgba(0,0,0,0.08)] bg-[#FAF9F6]/80 shrink-0">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
