@@ -1,6 +1,13 @@
-import { useState, useMemo, useRef } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { useState, useMemo, useRef, type ChangeEvent } from "react";
+import {
+  ChevronLeft,
+  ChevronRight,
+  LogOut,
+  Cloud,
+  CloudOff,
+} from "lucide-react";
 import { getMonthData, formatDateKey, isSameDay } from "./lib/dateUtils";
+import { useAuth } from "./hooks/useAuth";
 import { useRecords } from "./hooks/useRecords";
 import { useStickyNotes } from "./hooks/useStickyNotes";
 import { Sidebar } from "./components/Sidebar";
@@ -71,6 +78,7 @@ function parseExportFile(
 // ─── App ──────────────────────────────────────────────────────────────────────
 
 export default function App() {
+  const { user, loading, error, signInWithGoogle, signOutUser } = useAuth();
   const [viewDate, setViewDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -87,7 +95,7 @@ export default function App() {
     updateRecord,
     replaceAllRecords,
     mergeAllRecords,
-  } = useRecords();
+  } = useRecords(user?.uid ?? null);
   const {
     notes,
     addNote,
@@ -95,7 +103,7 @@ export default function App() {
     removeNote,
     replaceAllNotes,
     mergeAllNotes,
-  } = useStickyNotes();
+  } = useStickyNotes(user?.uid ?? null);
 
   // ── Export ─────────────────────────────────────────────────────────────────
   const handleExport = () => {
@@ -112,7 +120,7 @@ export default function App() {
   };
 
   // ── Import ─────────────────────────────────────────────────────────────────
-  const handleImportFile = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleImportFile = (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
     e.target.value = "";
@@ -213,7 +221,7 @@ export default function App() {
     >();
     Object.values(records)
       .flat()
-      .forEach((r) => {
+      .forEach((r: RecordItem) => {
         if (!r) return;
         const key = `${r.description}|${r.cost}|${r.category || "food"}|${r.customColor || ""}`;
         if (!counts.has(key)) {
@@ -259,9 +267,9 @@ export default function App() {
     <div className="w-full h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans flex overflow-hidden relative">
       <main className="flex-1 flex flex-col z-10">
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <header className="h-24 px-10 flex items-end pb-5 justify-between border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
-          <div>
-            <h1 className="font-serif text-3xl sm:text-5xl tracking-tighter">
+        <header className="min-h-24 px-10 pt-6 pb-5 flex items-end justify-between border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
+          <div className="shrink-0">
+            <h1 className="font-serif text-3xl sm:text-5xl tracking-tighter leading-[1.3] py-1 whitespace-nowrap">
               是啊，吃什么。
             </h1>
           </div>
@@ -293,6 +301,37 @@ export default function App() {
             >
               Today
             </button>
+
+            {loading ? (
+              <div className="text-[10px] font-bold uppercase tracking-widest opacity-30 border border-black/10 px-4 py-2 rounded-full hidden sm:flex items-center gap-1.5">
+                <Cloud className="w-3 h-3 animate-pulse" />
+                <span className="animate-pulse">···</span>
+              </div>
+            ) : user ? (
+              <button
+                onClick={signOutUser}
+                title={`Synced as ${user.email ?? "Google account"} — click to sign out`}
+                className="text-[10px] font-bold uppercase tracking-widest opacity-50 hover:opacity-100 border border-black/20 px-3 py-1.5 rounded-full transition-all hidden sm:flex items-center gap-1.5"
+              >
+                <Cloud className="w-3 h-3" />
+                Synced
+                <LogOut className="w-3 h-3 opacity-60" />
+              </button>
+            ) : (
+              <button
+                onClick={signInWithGoogle}
+                title="Optional: sign in with Google to back up and sync your data across devices"
+                className="text-[10px] font-bold uppercase tracking-widest bg-black text-white px-4 py-2 rounded-full transition-all hidden sm:flex items-center gap-1.5 shadow-sm hover:shadow-md hover:-translate-y-0.5"
+              >
+                <CloudOff className="w-3 h-3" />
+                Sign in to sync
+              </button>
+            )}
+            {error && (
+              <span className="hidden sm:block text-[10px] text-red-500 max-w-[160px] truncate">
+                {error}
+              </span>
+            )}
 
             {/* Utility buttons: Notes, Export, Import */}
             <div className="hidden sm:flex items-center gap-2">
