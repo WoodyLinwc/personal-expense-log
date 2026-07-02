@@ -84,7 +84,3 @@ A simple, intuitive calendar-based expense tracker for logging your daily meals 
 - **View totals**: Click "Total Spent" in the header to see a month-by-month breakdown of your spending history
 - **Sticky notes**: Click "📌 Notes" in the header to open the notes panel and jot down anything else
 - **Back up your data**: Click "↓ Export" to download a JSON backup of your records and notes; click "↑ Import" to restore a backup, choosing to either replace or merge with existing data
-
-## 📄 License
-
-This project doesn't currently include an explicit open-source license. Please reach out to the author to confirm usage or distribution terms.
