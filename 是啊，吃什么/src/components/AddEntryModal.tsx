@@ -1,23 +1,47 @@
-import React, { useState, useEffect } from 'react';
-import { X, Trash2 } from 'lucide-react';
-import { RecordItem, Category, CATEGORIES, CustomColor, CUSTOM_COLORS } from '../types';
-import { formatDateKey } from '../lib/dateUtils';
+import React, { useState, useEffect } from "react";
+import { X, Trash2 } from "lucide-react";
+import {
+  RecordItem,
+  Category,
+  CATEGORIES,
+  CustomColor,
+  CUSTOM_COLORS,
+} from "../types";
+import { formatDateKey } from "../lib/dateUtils";
 
 interface AddEntryModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onAdd: (dateKey: string, record: Omit<RecordItem, 'id'>) => void;
-  onUpdate?: (dateKey: string, id: string, record: Omit<RecordItem, 'id' | 'createdAt'>) => void;
+  onAdd: (dateKey: string, record: Omit<RecordItem, "id">) => void;
+  onUpdate?: (
+    dateKey: string,
+    id: string,
+    record: Omit<RecordItem, "id" | "createdAt">,
+  ) => void;
   onRemove?: (dateKey: string, id: string) => void;
   selectedDate: Date;
   editRecord?: RecordItem | null;
-  frequentEntries?: { description: string; cost: number; category: Category, customColor?: CustomColor }[];
+  frequentEntries?: {
+    description: string;
+    cost: number;
+    category: Category;
+    customColor?: CustomColor;
+  }[];
 }
 
-export function AddEntryModal({ isOpen, onClose, onAdd, onUpdate, onRemove, selectedDate, editRecord, frequentEntries }: AddEntryModalProps) {
+export function AddEntryModal({
+  isOpen,
+  onClose,
+  onAdd,
+  onUpdate,
+  onRemove,
+  selectedDate,
+  editRecord,
+  frequentEntries,
+}: AddEntryModalProps) {
   const [description, setDescription] = useState("");
   const [cost, setCost] = useState("");
-  const [category, setCategory] = useState<Category>('food');
+  const [category, setCategory] = useState<Category>("food");
   const [customColor, setCustomColor] = useState<CustomColor | "">("");
 
   useEffect(() => {
@@ -25,12 +49,12 @@ export function AddEntryModal({ isOpen, onClose, onAdd, onUpdate, onRemove, sele
       if (editRecord) {
         setDescription(editRecord.description);
         setCost(editRecord.cost > 0 ? editRecord.cost.toString() : "");
-        setCategory(editRecord.category || 'food');
+        setCategory(editRecord.category || "food");
         setCustomColor(editRecord.customColor || "");
       } else {
         setDescription("");
         setCost("");
-        setCategory('food');
+        setCategory("food");
         setCustomColor("");
       }
     }
@@ -44,7 +68,8 @@ export function AddEntryModal({ isOpen, onClose, onAdd, onUpdate, onRemove, sele
     if (isNaN(costValue) || costValue < 0) return;
     if (!description.trim() && costValue === 0 && customColor === "") return;
 
-    const finalColor = customColor === "" ? undefined : customColor as CustomColor;
+    const finalColor =
+      customColor === "" ? undefined : (customColor as CustomColor);
 
     if (editRecord && onUpdate) {
       onUpdate(formatDateKey(selectedDate), editRecord.id, {
@@ -73,36 +98,64 @@ export function AddEntryModal({ isOpen, onClose, onAdd, onUpdate, onRemove, sele
     }
   };
 
-  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-  const formattedDate = `${String(selectedDate.getDate()).padStart(2, '0')} ${months[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`;
+  const months = [
+    "Jan",
+    "Feb",
+    "Mar",
+    "Apr",
+    "May",
+    "Jun",
+    "Jul",
+    "Aug",
+    "Sep",
+    "Oct",
+    "Nov",
+    "Dec",
+  ];
+  const formattedDate = `${String(selectedDate.getDate()).padStart(2, "0")} ${months[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm transition-opacity">
       <div className="bg-[#FAF9F6] w-full max-w-md p-8 border border-[rgba(0,0,0,0.1)] shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
-        <button onClick={onClose} className="absolute top-5 right-5 p-2 opacity-50 hover:opacity-100 hover:bg-black/5 rounded-full transition-all">
-           <X className="w-6 h-6" />
+        <button
+          type="button"
+          onClick={onClose}
+          className="absolute top-3 right-3 w-11 h-11 flex items-center justify-center opacity-60 hover:opacity-100 hover:bg-black/5 active:bg-black/10 active:scale-95 rounded-full transition-all touch-manipulation"
+        >
+          <X className="w-6 h-6" />
         </button>
-        <h2 className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">{editRecord ? 'Edit Entry' : 'New Entry'}</h2>
-        <p className="font-serif text-2xl font-bold italic border-b border-black/10 pb-4 mb-6">{formattedDate}</p>
+        <h2 className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">
+          {editRecord ? "Edit Entry" : "New Entry"}
+        </h2>
+        <p className="font-serif text-2xl font-bold italic border-b border-black/10 pb-4 mb-6">
+          {formattedDate}
+        </p>
 
         {!editRecord && frequentEntries && frequentEntries.length > 0 && (
           <div className="mb-6">
-            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 block">Quick Pick</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 block">
+              Quick Pick
+            </label>
             <div className="flex flex-wrap gap-2">
               {frequentEntries.map((fe, idx) => (
-                 <button
-                   key={idx}
-                   type="button"
-                   onClick={() => {
-                     setDescription(fe.description);
-                     setCost(fe.cost > 0 ? fe.cost.toString() : "");
-                     setCategory(fe.category);
-                     setCustomColor(fe.customColor || "");
-                   }}
-                   className="py-1.5 px-3 text-xs bg-black/5 hover:bg-black/10 rounded-full font-medium transition-colors border border-black/5 flex items-center"
-                 >
-                   {fe.description} {fe.cost > 0 && <span className="font-serif italic ml-1 opacity-60">¥{fe.cost}</span>}
-                 </button>
+                <button
+                  key={idx}
+                  type="button"
+                  onClick={() => {
+                    setDescription(fe.description);
+                    setCost(fe.cost > 0 ? fe.cost.toString() : "");
+                    setCategory(fe.category);
+                    setCustomColor(fe.customColor || "");
+                  }}
+                  className="py-1.5 px-3 text-xs bg-black/5 hover:bg-black/10 rounded-full font-medium transition-colors border border-black/5 flex items-center"
+                >
+                  {fe.description}{" "}
+                  {fe.cost > 0 && (
+                    <span className="font-serif italic ml-1 opacity-60">
+                      ¥{fe.cost}
+                    </span>
+                  )}
+                </button>
               ))}
             </div>
           </div>
@@ -110,32 +163,38 @@ export function AddEntryModal({ isOpen, onClose, onAdd, onUpdate, onRemove, sele
 
         <form onSubmit={handleSubmit} className="flex flex-col gap-6">
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 block">Category</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 block">
+              Category
+            </label>
             <div className="grid grid-cols-3 gap-2">
-              {CATEGORIES.map(c => (
+              {CATEGORIES.map((c) => (
                 <button
                   key={c.id}
                   type="button"
                   onClick={() => setCategory(c.id)}
                   className={`h-10 px-2 text-xs font-semibold rounded transition-all flex items-center justify-center text-center border ${
-                    category === c.id 
-                      ? 'bg-black text-white border-black shadow-md' 
-                      : 'bg-white border-black/10 text-black/60 hover:border-black/30 hover:bg-black/5'
+                    category === c.id
+                      ? "bg-black text-white border-black shadow-md"
+                      : "bg-white border-black/10 text-black/60 hover:border-black/30 hover:bg-black/5"
                   }`}
                 >
-                  <span className="whitespace-nowrap overflow-hidden text-ellipsis">{c.label}</span>
+                  <span className="whitespace-nowrap overflow-hidden text-ellipsis">
+                    {c.label}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
 
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 block">Entry Color</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-3 block">
+              Entry Color
+            </label>
             <div className="flex flex-wrap gap-2">
               <button
                 type="button"
                 onClick={() => setCustomColor("")}
-                className={`w-8 h-8 rounded-full border transition-all ${customColor === "" ? 'border-black ring-2 ring-black/20 transform scale-110' : 'border-black/10 hover:border-black/50'}`}
+                className={`w-8 h-8 rounded-full border transition-all ${customColor === "" ? "border-black ring-2 ring-black/20 transform scale-110" : "border-black/10 hover:border-black/50"}`}
                 title="Default (from Category)"
               >
                 <span className="w-full h-full block rounded-full bg-[#FAF9F6] opacity-50 relative">
@@ -144,16 +203,16 @@ export function AddEntryModal({ isOpen, onClose, onAdd, onUpdate, onRemove, sele
               </button>
               {(Object.keys(CUSTOM_COLORS) as CustomColor[]).map((colorKey) => {
                 const colorClass = CUSTOM_COLORS[colorKey];
-                const bgOnlyClass = colorClass.split(' ')[0]; // extract background color e.g., bg-orange-100
+                const bgOnlyClass = colorClass.split(" ")[0]; // extract background color e.g., bg-orange-100
                 return (
                   <button
                     key={colorKey}
                     type="button"
                     onClick={() => setCustomColor(colorKey)}
                     className={`w-8 h-8 rounded-full border transition-all ${bgOnlyClass} ${
-                      customColor === colorKey 
-                        ? 'border-black ring-2 ring-black/20 transform scale-110 shadow-md' 
-                        : 'border-black/10 hover:border-black/50 hover:scale-105'
+                      customColor === colorKey
+                        ? "border-black ring-2 ring-black/20 transform scale-110 shadow-md"
+                        : "border-black/10 hover:border-black/50 hover:scale-105"
                     }`}
                   />
                 );
@@ -162,7 +221,9 @@ export function AddEntryModal({ isOpen, onClose, onAdd, onUpdate, onRemove, sele
           </div>
 
           <div>
-            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-1 block">Description</label>
+            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-1 block">
+              Description
+            </label>
             <input
               type="text"
               value={description}
@@ -174,9 +235,13 @@ export function AddEntryModal({ isOpen, onClose, onAdd, onUpdate, onRemove, sele
           </div>
 
           <div>
-             <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-1 block">Amount</label>
-             <div className="relative">
-              <span className="absolute left-0 top-1/2 -translate-y-1/2 font-serif font-bold italic opacity-60">¥</span>
+            <label className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-1 block">
+              Amount
+            </label>
+            <div className="relative">
+              <span className="absolute left-0 top-1/2 -translate-y-1/2 font-serif font-bold italic opacity-60">
+                ¥
+              </span>
               <input
                 type="number"
                 value={cost}

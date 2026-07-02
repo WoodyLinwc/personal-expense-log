@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef, type ChangeEvent } from "react";
+import { useState, useMemo, useEffect, type ChangeEvent } from "react";
 import {
   ChevronLeft,
   ChevronRight,
@@ -12,6 +12,7 @@ import { getMonthData, formatDateKey, isSameDay } from "./lib/dateUtils";
 import { useAuth } from "./hooks/useAuth";
 import { useRecords } from "./hooks/useRecords";
 import { useStickyNotes } from "./hooks/useStickyNotes";
+import { useCloudSync } from "./hooks/useCloudSync";
 import { Sidebar } from "./components/Sidebar";
 import { AddEntryModal } from "./components/AddEntryModal";
 import { TotalSpentModal } from "./components/TotalSpentModal";
@@ -87,9 +88,10 @@ export default function App() {
   const [isTotalModalOpen, setIsTotalModalOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [isBackupMenuOpen, setIsBackupMenuOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<RecordItem | null>(null);
   const [importStatus, setImportStatus] = useState<string | null>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [syncEnabled, setSyncEnabled] = useState(false);
 
   const {
     records,
@@ -98,7 +100,7 @@ export default function App() {
     updateRecord,
     replaceAllRecords,
     mergeAllRecords,
-  } = useRecords(user?.uid ?? null);
+  } = useRecords(user?.uid ?? null, syncEnabled);
   const {
     notes,
     addNote,
@@ -106,7 +108,38 @@ export default function App() {
     removeNote,
     replaceAllNotes,
     mergeAllNotes,
-  } = useStickyNotes(user?.uid ?? null);
+  } = useStickyNotes(user?.uid ?? null, syncEnabled);
+
+  const { conflict, markResolved } = useCloudSync(
+    user?.uid ?? null,
+    records,
+    notes,
+    setSyncEnabled,
+  );
+
+  // Local was empty and cloud had data — silently adopt the cloud version,
+  // nothing local would be lost, so there's nothing worth asking about.
+  useEffect(() => {
+    if (conflict?.autoAdopt) {
+      replaceAllRecords(conflict.cloudRecords);
+      replaceAllNotes(conflict.cloudNotes);
+      markResolved();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [conflict]);
+
+  const resolveConflict = (choice: "local" | "cloud" | "merge") => {
+    if (!conflict) return;
+    if (choice === "cloud") {
+      replaceAllRecords(conflict.cloudRecords);
+      replaceAllNotes(conflict.cloudNotes);
+    } else if (choice === "merge") {
+      mergeAllRecords(conflict.cloudRecords);
+      mergeAllNotes(conflict.cloudNotes);
+    }
+    // choice === "local": keep current local state as-is, just start syncing.
+    markResolved();
+  };
 
   // ── Export ─────────────────────────────────────────────────────────────────
   const handleExport = () => {
@@ -270,7 +303,19 @@ export default function App() {
     <div className="w-full h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans flex flex-col md:flex-row overflow-y-auto md:overflow-hidden relative">
       <main className="flex flex-col z-10 md:flex-1 min-h-0">
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <header className="min-h-24 px-10 pt-6 pb-5 flex items-end justify-between border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
+        <header className="relative z-20 min-h-24 px-10 pt-6 pb-5 flex items-end justify-between border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
+          <input
+            id="import-file-input"
+            type="file"
+            accept=".json,application/json"
+            className="hidden"
+            onChange={handleImportFile}
+            onClick={() => {
+              setIsBackupMenuOpen(false);
+              setIsMobileMenuOpen(false);
+            }}
+          />
+
           <div className="shrink-0">
             <h1 className="font-serif text-3xl sm:text-5xl tracking-tighter leading-[1.3] py-1 whitespace-nowrap">
               是啊，吃什么。
@@ -364,29 +409,40 @@ export default function App() {
                 )}
               </button>
 
-              <button
-                onClick={handleExport}
-                title="Download a JSON backup of all records and notes"
-                className="text-[10px] font-bold uppercase tracking-widest opacity-50 hover:opacity-100 border border-black/20 px-3 py-1.5 rounded-full transition-all"
-              >
-                ↓ Export
-              </button>
-
-              <button
-                onClick={() => fileInputRef.current?.click()}
-                title="Import records and notes from a JSON backup"
-                className="text-[10px] font-bold uppercase tracking-widest opacity-50 hover:opacity-100 border border-black/20 px-3 py-1.5 rounded-full transition-all"
-              >
-                ↑ Import
-              </button>
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                accept=".json,application/json"
-                className="hidden"
-                onChange={handleImportFile}
-              />
+              <div className="relative">
+                <button
+                  onClick={() => setIsBackupMenuOpen((v) => !v)}
+                  title="Export or import a JSON backup of all records and notes"
+                  className="text-[10px] font-bold uppercase tracking-widest opacity-50 hover:opacity-100 border border-black/20 px-3 py-1.5 rounded-full transition-all flex items-center gap-1"
+                >
+                  Backup ▾
+                </button>
+                {isBackupMenuOpen && (
+                  <>
+                    <div
+                      className="fixed inset-0 z-30"
+                      onClick={() => setIsBackupMenuOpen(false)}
+                    />
+                    <div className="absolute right-0 top-full mt-2 z-40 bg-[#FAF9F6] border border-black/10 rounded-xl shadow-lg overflow-hidden min-w-[140px]">
+                      <button
+                        onClick={() => {
+                          handleExport();
+                          setIsBackupMenuOpen(false);
+                        }}
+                        className="w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-black/5 transition-colors"
+                      >
+                        ↓ Export
+                      </button>
+                      <label
+                        htmlFor="import-file-input"
+                        className="block w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-black/5 transition-colors border-t border-black/5 cursor-pointer"
+                      >
+                        ↑ Import
+                      </label>
+                    </div>
+                  </>
+                )}
+              </div>
 
               {importStatus && (
                 <span
@@ -432,7 +488,7 @@ export default function App() {
 
         {/* ── Mobile menu (Today / Sync / Notes / Export / Import / Totals) ── */}
         {isMobileMenuOpen && (
-          <div className="sm:hidden border-b border-[rgba(0,0,0,0.05)] bg-[#FAF9F6]/95 backdrop-blur-md px-5 py-4 flex flex-col gap-3 z-10">
+          <div className="relative sm:hidden border-b border-[rgba(0,0,0,0.05)] bg-[#FAF9F6]/95 backdrop-blur-md px-5 py-4 flex flex-col gap-3 z-20">
             <div className="flex items-center gap-4">
               <div>
                 <p className="text-[10px] uppercase tracking-widest opacity-50 font-bold">
@@ -519,15 +575,12 @@ export default function App() {
                 ↓ Export
               </button>
 
-              <button
-                onClick={() => {
-                  fileInputRef.current?.click();
-                  setIsMobileMenuOpen(false);
-                }}
-                className="text-[10px] font-bold uppercase tracking-widest opacity-60 border border-black/20 px-3 py-1.5 rounded-full"
+              <label
+                htmlFor="import-file-input"
+                className="block w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-black/5 transition-colors border-t border-black/5 cursor-pointer"
               >
                 ↑ Import
-              </button>
+              </label>
             </div>
 
             {error && <span className="text-[10px] text-red-500">{error}</span>}
@@ -702,6 +755,49 @@ export default function App() {
         onUpdate={updateNote}
         onRemove={removeNote}
       />
+
+      {/* ── Cloud sync conflict ─────────────────────────────────────────── */}
+      {conflict && !conflict.autoAdopt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
+          <div className="bg-[#FAF9F6] w-full max-w-sm p-8 border border-[rgba(0,0,0,0.1)] shadow-2xl">
+            <h2 className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">
+              Cloud Sync
+            </h2>
+            <p className="font-serif text-xl font-bold italic border-b border-black/10 pb-4 mb-4">
+              本地和云端数据不一样
+            </p>
+            <p className="text-sm opacity-70 mb-6 leading-relaxed">
+              本地有 {conflict.localRecordCount} 条记录
+              {conflict.localNoteCount > 0 &&
+                ` / ${conflict.localNoteCount} 条便签`}
+              ，云端有 {conflict.cloudRecordCount} 条记录
+              {conflict.cloudNoteCount > 0 &&
+                ` / ${conflict.cloudNoteCount} 条便签`}
+              。选择要如何处理：
+            </p>
+            <div className="flex flex-col gap-2">
+              <button
+                onClick={() => resolveConflict("merge")}
+                className="w-full h-11 bg-[#1A1A1A] text-[#FAF9F6] rounded-full text-xs font-bold uppercase tracking-widest hover:bg-black/80 transition-colors"
+              >
+                两边合并（推荐）
+              </button>
+              <button
+                onClick={() => resolveConflict("local")}
+                className="w-full h-11 border border-black/20 rounded-full text-xs font-bold uppercase tracking-widest opacity-70 hover:opacity-100 transition-all"
+              >
+                只保留本地
+              </button>
+              <button
+                onClick={() => resolveConflict("cloud")}
+                className="w-full h-11 border border-black/20 rounded-full text-xs font-bold uppercase tracking-widest opacity-70 hover:opacity-100 transition-all"
+              >
+                只使用云端
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Decorative circles */}
       <div className="absolute -bottom-16 -left-16 w-64 h-64 border border-black rounded-full opacity-5 pointer-events-none"></div>

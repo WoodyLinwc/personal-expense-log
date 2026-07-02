@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { doc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { RecordItem, RecordsData } from "../types";
 
@@ -31,14 +31,12 @@ function mergeRecordsData(a: RecordsData, b: RecordsData): RecordsData {
 
 /**
  * Local-first records storage: always reads/writes localStorage, so the app
- * works fully offline with no account needed. If `uid` is provided (i.e. the
- * user is signed in with Google), it additionally:
- *  1. On sign-in, does a one-time merge of local + cloud data (so switching
- *     devices or signing in for the first time never loses anything).
- *  2. From then on, pushes every local change up to Firestore as a backup /
- *     cross-device sync — signing in is purely additive, never required.
+ * works fully offline with no account needed. When `syncEnabled` is true
+ * (decided by useCloudSync, after resolving any local-vs-cloud conflict),
+ * every subsequent local change is also pushed up to Firestore under
+ * `users/{uid}`.
  */
-export function useRecords(uid: string | null) {
+export function useRecords(uid: string | null, syncEnabled: boolean) {
   const [records, setRecords] = useState<RecordsData>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     try {
@@ -48,44 +46,13 @@ export function useRecords(uid: string | null) {
     }
   });
 
-  const recordsRef = useRef(records);
   useEffect(() => {
-    recordsRef.current = records;
     localStorage.setItem(STORAGE_KEY, JSON.stringify(records));
   }, [records]);
 
-  const syncedUidRef = useRef<string | null>(null);
-
-  // On sign-in: pull cloud data once and merge it into local state.
+  // Push local changes up to the cloud once syncing has been enabled.
   useEffect(() => {
-    if (!uid) {
-      syncedUidRef.current = null;
-      return;
-    }
-    if (syncedUidRef.current === uid) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const ref = doc(db, "users", uid);
-        const snap = await getDoc(ref);
-        if (cancelled) return;
-        const cloudRecords = (snap.data()?.records as RecordsData) || {};
-        const merged = mergeRecordsData(recordsRef.current, cloudRecords);
-        setRecords(merged);
-        syncedUidRef.current = uid;
-        await setDoc(ref, { records: stripUndefined(merged) }, { merge: true });
-      } catch (err) {
-        console.error("Cloud sync (records) failed:", err);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [uid]);
-
-  // While signed in, push every subsequent local change up to the cloud.
-  useEffect(() => {
-    if (!uid || syncedUidRef.current !== uid) return;
+    if (!uid || !syncEnabled) return;
     const ref = doc(db, "users", uid);
     try {
       setDoc(ref, { records: stripUndefined(records) }, { merge: true }).catch(
@@ -96,7 +63,7 @@ export function useRecords(uid: string | null) {
       // (e.g. an undefined field) — never let that crash the whole app.
       console.error("Cloud sync (records) failed:", err);
     }
-  }, [records, uid]);
+  }, [records, uid, syncEnabled]);
 
   const addRecord = (dateKey: string, record: Omit<RecordItem, "id">) => {
     setRecords((prev) => ({
@@ -128,12 +95,12 @@ export function useRecords(uid: string | null) {
     }));
   };
 
-  /** Overwrites all records (used by import → replace). */
+  /** Overwrites all records (used by import → replace, and cloud-sync resolution). */
   const replaceAllRecords = (data: RecordsData) => {
     setRecords(data);
   };
 
-  /** Merges imported records, deduplicating by id (used by import → merge). */
+  /** Merges imported/cloud records, deduplicating by id. */
   const mergeAllRecords = (data: RecordsData) => {
     setRecords((prev) => mergeRecordsData(prev, data));
   };

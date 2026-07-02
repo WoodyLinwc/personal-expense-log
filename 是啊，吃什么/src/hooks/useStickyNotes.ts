@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from "react";
-import { doc, getDoc, setDoc } from "firebase/firestore";
+import { useEffect, useState } from "react";
+import { doc, setDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
 import { StickyNote, StickyNoteColor } from "../types";
 
@@ -22,11 +22,11 @@ function mergeNotesData(a: StickyNote[], b: StickyNote[]): StickyNote[] {
 }
 
 /**
- * Local-first sticky notes storage. Mirrors the same optional-sync pattern
- * as useRecords: localStorage is the default and always works offline;
- * signing in additionally merges with and then syncs to Firestore.
+ * Local-first sticky notes storage. Mirrors the same externally-controlled
+ * sync pattern as useRecords: localStorage is the default and always works
+ * offline; once `syncEnabled` is true, changes are also pushed to Firestore.
  */
-export function useStickyNotes(uid: string | null) {
+export function useStickyNotes(uid: string | null, syncEnabled: boolean) {
   const [notes, setNotes] = useState<StickyNote[]>(() => {
     const saved = localStorage.getItem(NOTES_STORAGE_KEY);
     try {
@@ -36,42 +36,12 @@ export function useStickyNotes(uid: string | null) {
     }
   });
 
-  const notesRef = useRef(notes);
   useEffect(() => {
-    notesRef.current = notes;
     localStorage.setItem(NOTES_STORAGE_KEY, JSON.stringify(notes));
   }, [notes]);
 
-  const syncedUidRef = useRef<string | null>(null);
-
   useEffect(() => {
-    if (!uid) {
-      syncedUidRef.current = null;
-      return;
-    }
-    if (syncedUidRef.current === uid) return;
-    let cancelled = false;
-    (async () => {
-      try {
-        const ref = doc(db, "users", uid);
-        const snap = await getDoc(ref);
-        if (cancelled) return;
-        const cloudNotes = (snap.data()?.notes as StickyNote[]) || [];
-        const merged = mergeNotesData(notesRef.current, cloudNotes);
-        setNotes(merged);
-        syncedUidRef.current = uid;
-        await setDoc(ref, { notes: stripUndefined(merged) }, { merge: true });
-      } catch (err) {
-        console.error("Cloud sync (notes) failed:", err);
-      }
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [uid]);
-
-  useEffect(() => {
-    if (!uid || syncedUidRef.current !== uid) return;
+    if (!uid || !syncEnabled) return;
     const ref = doc(db, "users", uid);
     try {
       setDoc(ref, { notes: stripUndefined(notes) }, { merge: true }).catch(
@@ -80,7 +50,7 @@ export function useStickyNotes(uid: string | null) {
     } catch (err) {
       console.error("Cloud sync (notes) failed:", err);
     }
-  }, [notes, uid]);
+  }, [notes, uid, syncEnabled]);
 
   /** Creates a new note and returns its id so the caller can auto-focus it. */
   const addNote = (content = "", color: StickyNoteColor = "yellow"): string => {
@@ -107,10 +77,12 @@ export function useStickyNotes(uid: string | null) {
     setNotes((prev) => prev.filter((n) => n.id !== id));
   };
 
+  /** Overwrites all notes (used by import → replace, and cloud-sync resolution). */
   const replaceAllNotes = (incoming: StickyNote[]) => {
     setNotes(incoming);
   };
 
+  /** Merges imported/cloud notes, deduplicating by id. */
   const mergeAllNotes = (incoming: StickyNote[]) => {
     setNotes((prev) => mergeNotesData(prev, incoming));
   };
