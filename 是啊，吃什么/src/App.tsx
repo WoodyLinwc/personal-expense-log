@@ -12,17 +12,20 @@ import { getMonthData, formatDateKey, isSameDay } from "./lib/dateUtils";
 import { useAuth } from "./hooks/useAuth";
 import { useRecords } from "./hooks/useRecords";
 import { useStickyNotes } from "./hooks/useStickyNotes";
+import { useFridgeItems } from "./hooks/useFridgeItems";
 import { useCloudSync } from "./hooks/useCloudSync";
 import { Sidebar } from "./components/Sidebar";
 import { AddEntryModal } from "./components/AddEntryModal";
 import { TotalSpentModal } from "./components/TotalSpentModal";
 import { StickyNotesPanel } from "./components/StickyNotesPanel";
+import { FridgePanel } from "./components/FridgePanel";
 import {
   CATEGORY_COLORS,
   CUSTOM_COLORS,
   RecordItem,
   RecordsData,
   StickyNote,
+  FridgeItem,
 } from "./types";
 
 // ─── Import / Export helpers ──────────────────────────────────────────────────
@@ -55,24 +58,48 @@ function isValidNotes(data: unknown): data is StickyNote[] {
   );
 }
 
-/** Parses a JSON export file (v2 or legacy). Returns parsed data or an error string. */
+function isValidFridgeItems(data: unknown): data is FridgeItem[] {
+  if (!Array.isArray(data)) return false;
+  return data.every(
+    (it) =>
+      typeof it === "object" &&
+      it !== null &&
+      typeof (it as any).id === "string" &&
+      typeof (it as any).name === "string" &&
+      typeof (it as any).quantity === "number",
+  );
+}
+
+/** Parses a JSON export file (v3, v2, or legacy). Returns parsed data or an error string. */
 function parseExportFile(
   raw: unknown,
-): { records: RecordsData; notes: StickyNote[] } | { error: string } {
+):
+  | { records: RecordsData; notes: StickyNote[]; fridgeItems: FridgeItem[] }
+  | { error: string } {
   if (typeof raw !== "object" || raw === null)
     return { error: "Invalid file format." };
 
-  // v2 format: { version: 2, records: {...}, notes: [...] }
+  // v3 format: { version: 3, records: {...}, notes: [...], fridgeItems: [...] }
+  if ("version" in raw && (raw as any).version === 3) {
+    const { records, notes, fridgeItems } = raw as any;
+    if (!isValidRecordsData(records)) return { error: "Invalid records data." };
+    if (!isValidNotes(notes)) return { error: "Invalid notes data." };
+    if (!isValidFridgeItems(fridgeItems))
+      return { error: "Invalid fridge data." };
+    return { records, notes, fridgeItems };
+  }
+
+  // v2 format: { version: 2, records: {...}, notes: [...] } — no fridge data yet
   if ("version" in raw && (raw as any).version === 2) {
     const { records, notes } = raw as any;
     if (!isValidRecordsData(records)) return { error: "Invalid records data." };
     if (!isValidNotes(notes)) return { error: "Invalid notes data." };
-    return { records, notes };
+    return { records, notes, fridgeItems: [] };
   }
 
   // Legacy format: bare RecordsData object
   if (isValidRecordsData(raw)) {
-    return { records: raw, notes: [] };
+    return { records: raw, notes: [], fridgeItems: [] };
   }
 
   return { error: "Unrecognized file format." };
@@ -87,6 +114,7 @@ export default function App() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isTotalModalOpen, setIsTotalModalOpen] = useState(false);
   const [isNotesOpen, setIsNotesOpen] = useState(false);
+  const [isFridgeOpen, setIsFridgeOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isBackupMenuOpen, setIsBackupMenuOpen] = useState(false);
   const [editingRecord, setEditingRecord] = useState<RecordItem | null>(null);
@@ -109,11 +137,21 @@ export default function App() {
     replaceAllNotes,
     mergeAllNotes,
   } = useStickyNotes(user?.uid ?? null, syncEnabled);
+  const {
+    items: fridgeItems,
+    addItem: addFridgeItem,
+    adjustQuantity: adjustFridgeQuantity,
+    updateItem: updateFridgeItem,
+    removeItem: removeFridgeItem,
+    replaceAllItems: replaceAllFridgeItems,
+    mergeAllItems: mergeAllFridgeItems,
+  } = useFridgeItems(user?.uid ?? null, syncEnabled);
 
   const { conflict, markResolved } = useCloudSync(
     user?.uid ?? null,
     records,
     notes,
+    fridgeItems,
     setSyncEnabled,
   );
 
@@ -123,6 +161,7 @@ export default function App() {
     if (conflict?.autoAdopt) {
       replaceAllRecords(conflict.cloudRecords);
       replaceAllNotes(conflict.cloudNotes);
+      replaceAllFridgeItems(conflict.cloudFridgeItems);
       markResolved();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -133,9 +172,11 @@ export default function App() {
     if (choice === "cloud") {
       replaceAllRecords(conflict.cloudRecords);
       replaceAllNotes(conflict.cloudNotes);
+      replaceAllFridgeItems(conflict.cloudFridgeItems);
     } else if (choice === "merge") {
       mergeAllRecords(conflict.cloudRecords);
       mergeAllNotes(conflict.cloudNotes);
+      mergeAllFridgeItems(conflict.cloudFridgeItems);
     }
     // choice === "local": keep current local state as-is, just start syncing.
     markResolved();
@@ -143,7 +184,7 @@ export default function App() {
 
   // ── Export ─────────────────────────────────────────────────────────────────
   const handleExport = () => {
-    const payload = { version: 2, records, notes };
+    const payload = { version: 3, records, notes, fridgeItems };
     const blob = new Blob([JSON.stringify(payload, null, 2)], {
       type: "application/json",
     });
@@ -176,19 +217,23 @@ export default function App() {
         const totalDays = Object.keys(result.records).length;
         const totalRecords = Object.values(result.records).flat().length;
         const notesCount = result.notes.length;
+        const fridgeCount = result.fridgeItems.length;
 
         const replace = window.confirm(
           `Import ${totalRecords} record(s) across ${totalDays} day(s)` +
             (notesCount ? ` and ${notesCount} note(s)` : "") +
+            (fridgeCount ? ` and ${fridgeCount} fridge item(s)` : "") +
             ".\n\nOK → Replace all existing data\nCancel → Merge (keep existing, add new)",
         );
 
         if (replace) {
           replaceAllRecords(result.records);
           replaceAllNotes(result.notes);
+          replaceAllFridgeItems(result.fridgeItems);
         } else {
           mergeAllRecords(result.records);
           mergeAllNotes(result.notes);
+          mergeAllFridgeItems(result.fridgeItems);
         }
 
         setImportStatus("✓ Imported");
@@ -343,7 +388,7 @@ export default function App() {
               </button>
             </div>
 
-            {/* Mobile: collapse Today/Sync/Notes/Export/Import/Totals into one menu */}
+            {/* Mobile: collapse Today/Sync/Notes/Fridge/Export/Import/Totals into one menu */}
             <button
               onClick={() => setIsMobileMenuOpen((v) => !v)}
               className="sm:hidden p-2 rounded-full border border-black/20 opacity-60 hover:opacity-100 transition-opacity"
@@ -394,7 +439,7 @@ export default function App() {
               </span>
             )}
 
-            {/* Utility buttons: Notes, Export, Import */}
+            {/* Utility buttons: Notes, Fridge, Export, Import */}
             <div className="hidden sm:flex items-center gap-2">
               {/* Notes toggle */}
               <button
@@ -409,10 +454,23 @@ export default function App() {
                 )}
               </button>
 
+              {/* Fridge toggle */}
+              <button
+                onClick={() => setIsFridgeOpen(true)}
+                className="text-[10px] font-bold uppercase tracking-widest opacity-50 hover:opacity-100 border border-black/20 px-3 py-1.5 rounded-full transition-all flex items-center gap-1.5"
+              >
+                🧊 Fridge
+                {fridgeItems.length > 0 && (
+                  <span className="bg-black/10 rounded-full px-1.5 tabular-nums">
+                    {fridgeItems.length}
+                  </span>
+                )}
+              </button>
+
               <div className="relative">
                 <button
                   onClick={() => setIsBackupMenuOpen((v) => !v)}
-                  title="Export or import a JSON backup of all records and notes"
+                  title="Export or import a JSON backup of all records, notes, and fridge items"
                   className="text-[10px] font-bold uppercase tracking-widest opacity-50 hover:opacity-100 border border-black/20 px-3 py-1.5 rounded-full transition-all flex items-center gap-1"
                 >
                   Backup ▾
@@ -486,7 +544,7 @@ export default function App() {
           </div>
         </header>
 
-        {/* ── Mobile menu (Today / Sync / Notes / Export / Import / Totals) ── */}
+        {/* ── Mobile menu (Today / Sync / Notes / Fridge / Export / Import / Totals) ── */}
         {isMobileMenuOpen && (
           <div className="relative sm:hidden border-b border-[rgba(0,0,0,0.05)] bg-[#FAF9F6]/95 backdrop-blur-md px-5 py-4 flex flex-col gap-3 z-20">
             <div className="flex items-center gap-4">
@@ -561,6 +619,21 @@ export default function App() {
                 {notes.length > 0 && (
                   <span className="bg-black/10 rounded-full px-1.5 tabular-nums">
                     {notes.length}
+                  </span>
+                )}
+              </button>
+
+              <button
+                onClick={() => {
+                  setIsFridgeOpen(true);
+                  setIsMobileMenuOpen(false);
+                }}
+                className="text-[10px] font-bold uppercase tracking-widest opacity-60 border border-black/20 px-3 py-1.5 rounded-full flex items-center gap-1.5"
+              >
+                🧊 Fridge
+                {fridgeItems.length > 0 && (
+                  <span className="bg-black/10 rounded-full px-1.5 tabular-nums">
+                    {fridgeItems.length}
                   </span>
                 )}
               </button>
@@ -756,6 +829,16 @@ export default function App() {
         onRemove={removeNote}
       />
 
+      <FridgePanel
+        isOpen={isFridgeOpen}
+        onClose={() => setIsFridgeOpen(false)}
+        items={fridgeItems}
+        onAdd={addFridgeItem}
+        onAdjust={adjustFridgeQuantity}
+        onUpdate={updateFridgeItem}
+        onRemove={removeFridgeItem}
+      />
+
       {/* ── Cloud sync conflict ─────────────────────────────────────────── */}
       {conflict && !conflict.autoAdopt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm">
@@ -770,9 +853,13 @@ export default function App() {
               本地有 {conflict.localRecordCount} 条记录
               {conflict.localNoteCount > 0 &&
                 ` / ${conflict.localNoteCount} 条便签`}
+              {conflict.localFridgeCount > 0 &&
+                ` / ${conflict.localFridgeCount} 件冰箱物品`}
               ，云端有 {conflict.cloudRecordCount} 条记录
               {conflict.cloudNoteCount > 0 &&
                 ` / ${conflict.cloudNoteCount} 条便签`}
+              {conflict.cloudFridgeCount > 0 &&
+                ` / ${conflict.cloudFridgeCount} 件冰箱物品`}
               。选择要如何处理：
             </p>
             <div className="flex flex-col gap-2">

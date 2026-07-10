@@ -112,3 +112,15 @@ export const STICKY_NOTE_COLORS: Record<
     dot: "bg-purple-400",
   },
 };
+
+// ─── Fridge Inventory ────────────────────────────────────────────────────────
+
+export interface FridgeItem {
+  id: string;
+  name: string;
+  quantity: number;
+  unit?: string;
+  /** Quantity at or below which the item is flagged as needing restock. Defaults to 1. */
+  lowStockAt?: number;
+  updatedAt: number;
+}

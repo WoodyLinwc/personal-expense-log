@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../lib/firebase";
-import { RecordsData, StickyNote } from "../types";
+import { RecordsData, StickyNote, FridgeItem } from "../types";
 
 function isEmptyRecords(data: RecordsData): boolean {
   return Object.values(data).every(
@@ -36,10 +36,13 @@ function deepEqual(a: unknown, b: unknown): boolean {
 export interface CloudConflict {
   cloudRecords: RecordsData;
   cloudNotes: StickyNote[];
+  cloudFridgeItems: FridgeItem[];
   localRecordCount: number;
   cloudRecordCount: number;
   localNoteCount: number;
   cloudNoteCount: number;
+  localFridgeCount: number;
+  cloudFridgeCount: number;
   /** True when local was empty, so we can silently adopt the cloud data
    *  without bothering the user — there's nothing local to lose. */
   autoAdopt: boolean;
@@ -56,6 +59,7 @@ export function useCloudSync(
   uid: string | null,
   records: RecordsData,
   notes: StickyNote[],
+  fridgeItems: FridgeItem[],
   setSyncEnabled: (v: boolean) => void,
 ) {
   const [conflict, setConflict] = useState<CloudConflict | null>(null);
@@ -63,12 +67,16 @@ export function useCloudSync(
 
   const recordsRef = useRef(records);
   const notesRef = useRef(notes);
+  const fridgeItemsRef = useRef(fridgeItems);
   useEffect(() => {
     recordsRef.current = records;
   }, [records]);
   useEffect(() => {
     notesRef.current = notes;
   }, [notes]);
+  useEffect(() => {
+    fridgeItemsRef.current = fridgeItems;
+  }, [fridgeItems]);
 
   useEffect(() => {
     if (!uid) {
@@ -88,16 +96,23 @@ export function useCloudSync(
         const data = snap.data();
         const cloudRecords = (data?.records as RecordsData) || {};
         const cloudNotes = (data?.notes as StickyNote[]) || [];
+        const cloudFridgeItems = (data?.fridgeItems as FridgeItem[]) || [];
         const localRecords = recordsRef.current;
         const localNotes = notesRef.current;
+        const localFridgeItems = fridgeItemsRef.current;
 
         const cloudEmpty =
-          isEmptyRecords(cloudRecords) && cloudNotes.length === 0;
+          isEmptyRecords(cloudRecords) &&
+          cloudNotes.length === 0 &&
+          cloudFridgeItems.length === 0;
         const localEmpty =
-          isEmptyRecords(localRecords) && localNotes.length === 0;
+          isEmptyRecords(localRecords) &&
+          localNotes.length === 0 &&
+          localFridgeItems.length === 0;
         const identical =
           deepEqual(cloudRecords, localRecords) &&
-          deepEqual(cloudNotes, localNotes);
+          deepEqual(cloudNotes, localNotes) &&
+          deepEqual(cloudFridgeItems, localFridgeItems);
 
         if (cloudEmpty || identical) {
           checkedUidRef.current = uid;
@@ -109,10 +124,13 @@ export function useCloudSync(
         setConflict({
           cloudRecords,
           cloudNotes,
+          cloudFridgeItems,
           localRecordCount: countRecords(localRecords),
           cloudRecordCount: countRecords(cloudRecords),
           localNoteCount: localNotes.length,
           cloudNoteCount: cloudNotes.length,
+          localFridgeCount: localFridgeItems.length,
+          cloudFridgeCount: cloudFridgeItems.length,
           autoAdopt: localEmpty,
         });
       } catch (err) {
@@ -128,7 +146,7 @@ export function useCloudSync(
   }, [uid]);
 
   /** Call after the conflict has been handled (by the caller applying the
-   *  chosen data via replaceAllRecords/mergeAllRecords) to resume syncing. */
+   *  chosen data via replaceAllRecords/mergeAllRecords/etc.) to resume syncing. */
   const markResolved = () => {
     checkedUidRef.current = uid;
     setConflict(null);
