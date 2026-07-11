@@ -345,7 +345,7 @@ export default function App() {
   };
 
   return (
-    <div className="w-full h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans flex flex-col md:flex-row overflow-y-auto md:overflow-hidden relative">
+    <div className="w-full h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans flex flex-col md:flex-row overflow-x-hidden overflow-y-auto md:overflow-hidden relative">
       <main className="flex flex-col z-10 md:flex-1 min-h-0">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <header className="relative z-20 min-h-24 px-4 sm:px-10 pt-4 sm:pt-6 pb-4 sm:pb-5 flex flex-wrap sm:flex-nowrap items-end justify-between gap-y-3 border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
@@ -673,7 +673,7 @@ export default function App() {
         )}
 
         {/* ── Calendar ───────────────────────────────────────────────────── */}
-        <section className="flex-1 flex flex-col h-[65vh] md:h-full overflow-hidden p-3 sm:p-8 lg:p-12 relative z-10">
+        <section className="md:flex-1 flex flex-col md:h-full md:overflow-hidden p-2 sm:p-8 lg:p-12 relative z-10">
           <div className="flex-1 flex flex-col bg-[#FAF9F6]/60 backdrop-blur-md border border-[rgba(0,0,0,0.08)] rounded-2xl shadow-sm overflow-hidden">
             <div className="grid grid-cols-7 border-b border-[rgba(0,0,0,0.08)] bg-[#FAF9F6]/80 shrink-0">
               {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map((d) => (
@@ -686,7 +686,7 @@ export default function App() {
               ))}
             </div>
 
-            <div className="flex-1 grid grid-cols-7 auto-rows-fr overflow-y-auto min-h-0 bg-transparent">
+            <div className="flex-1 grid grid-cols-7 auto-rows-[minmax(76px,auto)] md:auto-rows-fr md:overflow-y-auto min-h-0 bg-transparent">
               {monthDays.map((day, idx) => {
                 const key = formatDateKey(day.date);
                 const isToday = isSameDay(day.date, new Date());
@@ -715,7 +715,7 @@ export default function App() {
                     key={idx}
                     onClick={() => setSelectedDate(day.date)}
                     onDoubleClick={() => handleDoubleDateClick(day.date)}
-                    className={`border-r border-b border-[rgba(0,0,0,0.08)] p-3 transition-colors cursor-pointer flex flex-col relative select-none
+                    className={`border-r border-b border-[rgba(0,0,0,0.08)] p-1.5 sm:p-3 transition-colors cursor-pointer flex flex-col relative select-none
                       ${(idx + 1) % 7 === 0 ? "border-r-0" : ""}
                       ${idx >= monthDays.length - 7 ? "border-b-0" : ""}
                       ${
