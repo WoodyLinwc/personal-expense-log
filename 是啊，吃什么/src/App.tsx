@@ -348,7 +348,7 @@ export default function App() {
     <div className="w-full h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans flex flex-col md:flex-row overflow-y-auto md:overflow-hidden relative">
       <main className="flex flex-col z-10 md:flex-1 min-h-0">
         {/* ── Header ─────────────────────────────────────────────────────── */}
-        <header className="relative z-20 min-h-24 px-10 pt-6 pb-5 flex items-end justify-between border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
+        <header className="relative z-20 min-h-24 px-4 sm:px-10 pt-4 sm:pt-6 pb-4 sm:pb-5 flex flex-wrap sm:flex-nowrap items-end justify-between gap-y-3 border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
           <input
             id="import-file-input"
             type="file"
@@ -361,13 +361,27 @@ export default function App() {
             }}
           />
 
-          <div className="shrink-0">
+          <div className="shrink-0 min-w-0">
             <h1 className="font-serif text-3xl sm:text-5xl tracking-tighter leading-[1.3] py-1 whitespace-nowrap">
               是啊，吃什么。
             </h1>
           </div>
 
-          <div className="flex items-center gap-6 sm:gap-8">
+          {/* Mobile: collapse Today/Sync/Notes/Fridge/Export/Import/Totals into one menu.
+              Sits on the first row next to the title; the month nav wraps to a second row. */}
+          <button
+            onClick={() => setIsMobileMenuOpen((v) => !v)}
+            className="sm:hidden p-2 mb-1.5 shrink-0 rounded-full border border-black/20 opacity-60 hover:opacity-100 transition-opacity"
+            aria-label="More options"
+          >
+            {isMobileMenuOpen ? (
+              <X className="w-5 h-5" />
+            ) : (
+              <MoreHorizontal className="w-5 h-5" />
+            )}
+          </button>
+
+          <div className="flex items-center gap-6 sm:gap-8 w-full sm:w-auto justify-center sm:justify-end">
             {/* Month navigation */}
             <div className="flex items-center gap-2">
               <button
@@ -387,19 +401,6 @@ export default function App() {
                 <ChevronRight className="w-6 h-6" />
               </button>
             </div>
-
-            {/* Mobile: collapse Today/Sync/Notes/Fridge/Export/Import/Totals into one menu */}
-            <button
-              onClick={() => setIsMobileMenuOpen((v) => !v)}
-              className="sm:hidden p-2 rounded-full border border-black/20 opacity-60 hover:opacity-100 transition-opacity"
-              aria-label="More options"
-            >
-              {isMobileMenuOpen ? (
-                <X className="w-5 h-5" />
-              ) : (
-                <MoreHorizontal className="w-5 h-5" />
-              )}
-            </button>
 
             <button
               onClick={goToday}
@@ -650,7 +651,7 @@ export default function App() {
 
               <label
                 htmlFor="import-file-input"
-                className="block w-full text-left px-4 py-2.5 text-[10px] font-bold uppercase tracking-widest hover:bg-black/5 transition-colors border-t border-black/5 cursor-pointer"
+                className="text-[10px] font-bold uppercase tracking-widest opacity-60 border border-black/20 px-3 py-1.5 rounded-full cursor-pointer"
               >
                 ↑ Import
               </label>
