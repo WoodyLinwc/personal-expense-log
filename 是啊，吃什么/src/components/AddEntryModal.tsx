@@ -115,8 +115,8 @@ export function AddEntryModal({
   const formattedDate = `${String(selectedDate.getDate()).padStart(2, "0")} ${months[selectedDate.getMonth()]} ${selectedDate.getFullYear()}`;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm transition-opacity">
-      <div className="bg-[#FAF9F6] w-full max-w-md p-8 border border-[rgba(0,0,0,0.1)] shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/20 backdrop-blur-sm transition-opacity overflow-y-auto overscroll-contain">
+      <div className="bg-[#FAF9F6] w-full max-w-md p-6 pb-[calc(env(safe-area-inset-bottom)+1.5rem)] sm:p-8 border border-[rgba(0,0,0,0.1)] shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 rounded-t-3xl sm:rounded-none max-h-[92dvh] overflow-y-auto">
         <button
           type="button"
           onClick={onClose}
@@ -229,8 +229,11 @@ export function AddEntryModal({
               value={description}
               onChange={(e) => setDescription(e.target.value)}
               placeholder="What did you spend on?"
-              className="w-full bg-transparent border-b border-black/20 py-2 focus:outline-none focus:border-black transition-colors text-sm font-semibold placeholder:font-normal placeholder:opacity-50"
-              autoFocus
+              className="w-full bg-transparent border-b border-black/20 py-2 focus:outline-none focus:border-black transition-colors text-base sm:text-sm font-semibold placeholder:font-normal placeholder:opacity-50"
+              autoFocus={
+                typeof window !== "undefined" &&
+                window.matchMedia("(min-width: 768px)").matches
+              }
             />
           </div>
 
@@ -244,6 +247,7 @@ export function AddEntryModal({
               </span>
               <input
                 type="number"
+                inputMode="decimal"
                 value={cost}
                 onChange={(e) => setCost(e.target.value)}
                 placeholder="0.00"

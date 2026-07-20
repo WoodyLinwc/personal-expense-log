@@ -5,7 +5,7 @@ interface LoginScreenProps {
 
 export function LoginScreen({ onSignIn, error }: LoginScreenProps) {
   return (
-    <div className="w-full h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans flex items-center justify-center relative overflow-hidden">
+    <div className="w-full min-h-dvh bg-[#FAF9F6] text-[#1A1A1A] font-sans flex items-center justify-center relative overflow-hidden">
       <div className="absolute -bottom-16 -left-16 w-64 h-64 border border-black rounded-full opacity-5 pointer-events-none"></div>
       <div className="absolute top-1/2 -right-32 w-80 h-80 border border-black rounded-full opacity-5 pointer-events-none"></div>
 

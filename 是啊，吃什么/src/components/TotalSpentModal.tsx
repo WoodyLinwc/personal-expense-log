@@ -14,8 +14,8 @@ export function TotalSpentModal({ isOpen, onClose, lifetimeTotal, monthlyTotals 
   const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm transition-opacity">
-      <div className="bg-[#FAF9F6] w-full max-w-sm p-8 border border-[rgba(0,0,0,0.1)] shadow-2xl relative animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/20 backdrop-blur-sm transition-opacity overflow-y-auto overscroll-contain">
+      <div className="bg-[#FAF9F6] w-full max-w-sm p-8 border border-[rgba(0,0,0,0.1)] shadow-2xl relative animate-in fade-in zoom-in-95 duration-200 max-h-[90dvh] overflow-y-auto rounded-2xl sm:rounded-none">
         <button onClick={onClose} className="absolute top-5 right-5 p-2 opacity-50 hover:opacity-100 hover:bg-black/5 rounded-full transition-all">
            <X className="w-6 h-6" />
         </button>

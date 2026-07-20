@@ -1,1 +1,35 @@
 @import "tailwindcss";
+
+/* ─── Mobile browser fixes ─────────────────────────────────────────────── */
+
+/* Prevent iOS Safari from inflating text sizes on rotation */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+/* Kill the 300ms tap delay and — critically — the double-tap-to-zoom
+   gesture on interactive elements. The calendar relies on double-tap to
+   open the entry modal; without this, Safari/Chrome zoom the page instead
+   ("the scale is messed up"). */
+button,
+a,
+input,
+select,
+textarea,
+label,
+[role="button"] {
+  touch-action: manipulation;
+}
+
+/* iOS Safari auto-zooms the whole page when focusing any input whose
+   font-size is below 16px, and often doesn't zoom back out. Force a
+   minimum of 16px on touch-size screens so focusing the Add Entry form
+   never triggers zoom. */
+@media (max-width: 767px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}

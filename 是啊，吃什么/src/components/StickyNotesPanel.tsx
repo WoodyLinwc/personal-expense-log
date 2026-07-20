@@ -140,7 +140,7 @@ export function StickyNotesPanel({
 
       {/* Slide-in panel */}
       <div
-        className={`fixed right-0 top-0 h-full w-80 bg-[#FAF9F6] border-l border-[rgba(0,0,0,0.08)]
+        className={`fixed right-0 top-0 h-dvh w-full sm:w-80 bg-[#FAF9F6] border-l border-[rgba(0,0,0,0.08)]
           z-40 flex flex-col shadow-2xl transition-transform duration-300 ease-in-out
           ${isOpen ? "translate-x-0" : "translate-x-full"}`}
       >
@@ -174,7 +174,7 @@ export function StickyNotesPanel({
         </div>
 
         {/* Notes list */}
-        <div className="flex-1 overflow-y-auto p-4 flex flex-col gap-3">
+        <div className="flex-1 overflow-y-auto p-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] flex flex-col gap-3">
           {notes.length === 0 ? (
             <div className="flex flex-col items-center justify-center flex-1 gap-3 py-20 opacity-30 select-none pointer-events-none">
               <span className="text-4xl">📝</span>

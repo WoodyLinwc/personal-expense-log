@@ -43,7 +43,7 @@ export function Sidebar({
   };
 
   return (
-    <aside className="w-full md:w-[320px] border-t md:border-t-0 md:border-l border-[rgba(0,0,0,0.05)] bg-white/40 backdrop-blur-xl p-5 sm:p-8 flex flex-col shrink-0 z-20 md:h-full">
+    <aside className="w-full md:w-[320px] border-t md:border-t-0 md:border-l border-[rgba(0,0,0,0.05)] bg-white/40 backdrop-blur-xl p-5 sm:p-8 pb-[calc(env(safe-area-inset-bottom)+6rem)] md:pb-8 flex flex-col shrink-0 z-20 md:h-full">
       {/* Target Date Summary */}
       <div className="mb-6 md:mb-10">
         <h3 className="text-[10px] font-bold uppercase tracking-widest opacity-40 mb-2">

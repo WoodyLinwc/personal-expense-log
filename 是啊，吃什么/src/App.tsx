@@ -6,6 +6,7 @@ import {
   Cloud,
   CloudOff,
   MoreHorizontal,
+  Plus,
   X,
 } from "lucide-react";
 import { getMonthData, formatDateKey, isSameDay } from "./lib/dateUtils";
@@ -345,7 +346,7 @@ export default function App() {
   };
 
   return (
-    <div className="w-full h-screen bg-[#FAF9F6] text-[#1A1A1A] font-sans flex flex-col md:flex-row overflow-x-hidden overflow-y-auto md:overflow-hidden relative">
+    <div className="w-full min-h-dvh md:min-h-0 md:h-dvh bg-[#FAF9F6] text-[#1A1A1A] font-sans flex flex-col md:flex-row overflow-x-clip md:overflow-hidden relative">
       <main className="flex flex-col z-10 md:flex-1 min-h-0">
         {/* ── Header ─────────────────────────────────────────────────────── */}
         <header className="relative z-20 min-h-24 px-4 sm:px-10 pt-4 sm:pt-6 pb-4 sm:pb-5 flex flex-wrap sm:flex-nowrap items-end justify-between gap-y-3 border-b border-[rgba(0,0,0,0.05)] shrink-0 bg-[#FAF9F6]/80 backdrop-blur-md">
@@ -715,7 +716,7 @@ export default function App() {
                     key={idx}
                     onClick={() => setSelectedDate(day.date)}
                     onDoubleClick={() => handleDoubleDateClick(day.date)}
-                    className={`border-r border-b border-[rgba(0,0,0,0.08)] p-1.5 sm:p-3 transition-colors cursor-pointer flex flex-col relative select-none
+                    className={`border-r border-b border-[rgba(0,0,0,0.08)] p-1.5 sm:p-3 transition-colors cursor-pointer flex flex-col relative select-none touch-manipulation
                       ${(idx + 1) % 7 === 0 ? "border-r-0" : ""}
                       ${idx >= monthDays.length - 7 ? "border-b-0" : ""}
                       ${
@@ -744,7 +745,7 @@ export default function App() {
                       </span>
                     </div>
 
-                    <div className="flex flex-col gap-1 overflow-y-auto scrollbar-none flex-1 min-h-0 z-10 w-full relative">
+                    <div className="flex flex-col gap-1 overflow-hidden md:overflow-y-auto scrollbar-none flex-1 min-h-0 z-10 w-full relative">
                       {displayRecords.map((r) => {
                         const c =
                           (r.customColor && CUSTOM_COLORS[r.customColor]) ||
@@ -801,6 +802,20 @@ export default function App() {
         }}
         onEditRecord={(record) => handleEditRecord(selectedDate, record)}
       />
+
+      {/* ── Mobile floating "add entry" button ────────────────────────────
+          On phones the sidebar's Add Entry button sits below the calendar,
+          so give thumbs a fixed shortcut that's always reachable. */}
+      <button
+        onClick={() => {
+          setEditingRecord(null);
+          setIsModalOpen(true);
+        }}
+        aria-label="Add entry"
+        className="md:hidden fixed bottom-[calc(env(safe-area-inset-bottom)+1.25rem)] right-5 z-40 w-14 h-14 rounded-full bg-[#1A1A1A] text-[#FAF9F6] shadow-lg shadow-black/20 flex items-center justify-center active:scale-95 transition-transform touch-manipulation"
+      >
+        <Plus className="w-6 h-6" />
+      </button>
 
       {/* ── Modals & Panels ───────────────────────────────────────────────── */}
       <AddEntryModal

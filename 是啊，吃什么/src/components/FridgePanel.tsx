@@ -195,8 +195,12 @@ export function FridgePanel({
     if (isOpen) {
       setName("");
       setUnit("");
-      const t = setTimeout(() => inputRef.current?.focus(), 350);
-      return () => clearTimeout(t);
+      // Auto-focus only on desktop — on phones this immediately pops the
+      // keyboard over the panel (and can trigger iOS focus-zoom).
+      if (window.matchMedia("(min-width: 768px)").matches) {
+        const t = setTimeout(() => inputRef.current?.focus(), 350);
+        return () => clearTimeout(t);
+      }
     }
   }, [isOpen]);
 
